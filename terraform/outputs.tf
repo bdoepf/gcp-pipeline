@@ -9,3 +9,8 @@ output "bucket-name" {
 output "region" {
   value = "${var.region}"
 }
+
+output "topic-name" {
+  value = "${google_pubsub_topic.pipeline-ingest.name}"
+}
+
