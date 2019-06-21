@@ -3,5 +3,4 @@ variable "region" {
 }
 
 variable "project" {
-    default = "testproject-data-2451"
 }
