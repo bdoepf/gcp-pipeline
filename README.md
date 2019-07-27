@@ -1,13 +1,13 @@
 # Serverless data pipeline on Google Cloud Platform (GCP)
 This pipeline ingests data by using PubSub. 
-Dataflow is used for processing and Cloud Storage as data lake sink. 
+Dataflow is used for processing and enriching. Cloud Storage as data lake sink. 
 
 Used Services:
 * Pub/Sub
 * Apache Beam & Dataflow
 * Cloud Storage 
 
-## Usage-
+## Usage:
 ### Pre-requirements:
 * terraform installed
 * python3 installed
@@ -47,5 +47,4 @@ Check if Dataflow writes the file in 1min batched files into `gs://data-pipeline
 * Dataflow:
     * Avro / Parquet instead of json new line delimited files for storing files on Cloud Storage
     * BigQuery beside Cloud Storage as second streaming sink for structured data
-    * Cloud SQL table as lookup for some enrichment in streaming
 * ...

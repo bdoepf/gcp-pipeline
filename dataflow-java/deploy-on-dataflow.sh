@@ -6,4 +6,5 @@ mvn compile exec:java -Dexec.mainClass=de.bdoepf.Main \
                   --region=${GCP_REGION} \
                   --subscription=${SUBSCRIPTION} \
                   --gcpTempLocation=gs://${PIPELINE_BUCKET}/dataflow/tmp \
+                  --enrichmentPath=gs://${PIPELINE_BUCKET}/${ENRICHMENT_CSV_PATH} \
                   --output=gs://${PIPELINE_BUCKET}/dataflow/data/"

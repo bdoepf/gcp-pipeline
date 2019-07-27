@@ -1,5 +1,6 @@
 package de.bdoepf;
 
+import com.google.api.services.dataflow.model.ParDoInstruction;
 import com.google.gson.Gson;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.AvroIO;
@@ -9,12 +10,16 @@ import org.apache.beam.sdk.io.gcp.pubsub.PubsubMessage;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.transforms.DoFn;
+import org.apache.beam.sdk.transforms.MapElements;
 import org.apache.beam.sdk.transforms.ParDo;
+import org.apache.beam.sdk.transforms.View;
 import org.apache.beam.sdk.transforms.windowing.AfterWatermark;
 import org.apache.beam.sdk.transforms.windowing.FixedWindows;
 import org.apache.beam.sdk.transforms.windowing.Window;
-import org.apache.beam.sdk.values.PCollection;
+import org.apache.beam.sdk.values.*;
 import org.joda.time.Duration;
+
+import java.util.Map;
 
 public class Main {
 
@@ -39,7 +44,9 @@ public class Main {
 
         void setOutput(String output);
 
+        String getEnrichmentPath();
 
+        void setEnrichmentPath(String enrichment);
     }
 
     public static void main(String[] args) {
@@ -50,19 +57,42 @@ public class Main {
         options.setStreaming(true);
         Pipeline pipeline = Pipeline.create(options);
 
+        // Side input
+        PCollectionView<Map<Integer, String>> enrichmentSideInput = pipeline
+                .apply("Read enrichment csv", TextIO.read().from(options.getEnrichmentPath()))
+                .apply("Split csv", MapElements
+                        .into(TypeDescriptors.kvs(TypeDescriptors.integers(), TypeDescriptors.strings()))
+                        .via((String line) -> {
+                            String[] split = line.split(",");
+                            return KV.of(Integer.parseInt(split[0]), split[1]);
+                        }))
+                .apply("Side input", View.asMap());
+
+
         // read messages from PubSub
         PCollection<PubsubMessage> messages = pipeline
                 .apply(PubsubIO.readMessages().fromSubscription(options.getSubscription()));
 
         // output portion of the pipeline
         messages
-                .apply("To String", ParDo.of(new DoFn<PubsubMessage, String>() {
+                .apply("To String", MapElements
+                        .into(TypeDescriptors.strings())
+                        .via((PubsubMessage msg) -> new String(msg.getPayload())))
+
+                // Decode
+                .apply("Decode", MapElements
+                        .into(TypeDescriptor.of(IncomingPubSubMsg.class))
+                        .via(s -> new Gson().fromJson(s, IncomingPubSubMsg.class)))
+
+                // enrich message by side input
+                .apply("Enrich msgs", ParDo.of(new DoFn<IncomingPubSubMsg, String>() {
                     @ProcessElement
-                    public void processElement(ProcessContext c) throws Exception {
-                        String message = new String(c.element().getPayload());
-                        c.output(message);
+                    public void processElement(@Element IncomingPubSubMsg incomingPubSubMsg, OutputReceiver<String> out, ProcessContext c) {
+                        String additional = c.sideInput(enrichmentSideInput).get(incomingPubSubMsg.getE());
+                        additional = (additional == null) ? "no additional info" : additional;
+                        out.output(incomingPubSubMsg.getA() + "," + incomingPubSubMsg.getB() + "," + incomingPubSubMsg.getE() + "," + additional);
                     }
-                }))
+                }).withSideInputs(enrichmentSideInput))
 
                 // Batch events into n minute windows
                 .apply("Batch Events", Window.<String>into(

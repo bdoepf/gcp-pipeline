@@ -20,7 +20,7 @@ def callback(message_future):
 
 
 for n in range(1, 100):
-    data_obj = {'a': n, 'b': 'The {} msg'.format(n)}
+    data_obj = {'a': n, 'b': f'The {n} msg', 'e': n % 3}
     data = json.dumps(data_obj)
     # Data must be a bytestring
     data = data.encode('utf-8')
